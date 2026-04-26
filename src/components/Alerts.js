@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaExclamationCircle, FaExclamationTriangle, FaCheckCircle, FaBell, FaShieldAlt } from "react-icons/fa";
 import { useSettings } from "../SettingsContext";
 import { useMetrics } from "../MetricsContext";
 
 export default function Alerts() {
-  const { settings } = useSettings();
+  useSettings();
   const { alerts, acknowledgeAlert } = useMetrics();
   
   const [filter, setFilter] = useState("all");

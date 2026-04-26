@@ -38,6 +38,7 @@ export const SettingsProvider = ({ children }) => {
     } else {
       document.body.setAttribute("data-theme", settings.theme);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const updateSetting = (key, val) => {

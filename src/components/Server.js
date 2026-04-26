@@ -1,10 +1,9 @@
-import React, { useEffect, useState, useRef } from "react";
+import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FaServer, FaThermometerHalf, FaMicrochip,
   FaNetworkWired, FaMemory, FaCircle,
 } from "react-icons/fa";
-import { MdRefresh } from "react-icons/md";
 import { useSettings } from "../SettingsContext";
 import { useMetrics } from "../MetricsContext";
 
@@ -231,7 +230,6 @@ export default function Servers() {
 
   /* aggregate stats */
   const avgCpu  = servers.length ? Math.round(servers.reduce((a, s) => a + s.cpu,  0) / servers.length) : 0;
-  const avgTemp = servers.length ? Math.round(servers.reduce((a, s) => a + s.temp, 0) / servers.length) : 0;
   const avgRam  = servers.length ? Math.round(servers.reduce((a, s) => a + s.ram,  0) / servers.length) : 0;
 
   const statusCounts = {
