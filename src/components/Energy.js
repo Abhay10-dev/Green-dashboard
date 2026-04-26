@@ -8,10 +8,9 @@ import {
 import { FaBolt, FaLeaf, FaDollarSign, FaIndustry, FaChartLine } from "react-icons/fa";
 import PowerDistributionCard from "./PowerDistributionCard";
 import { useSettings } from "../SettingsContext";
+import { useMetrics } from "../MetricsContext";
 
 ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend, Filler);
-
-const randF = (min, max) => parseFloat((Math.random() * (max - min) + min).toFixed(2));
 
 const chartOpts = {
   responsive: true,
@@ -32,47 +31,25 @@ const cardVariants = {
 
 export default function Energy() {
   const { settings } = useSettings();
-  const [data, setData] = useState({
-    power: 7.5,
-    pue: 1.3,
-    energySaved: 14.2,
-    percentImproved: 8.5,
-  });
+  const { metrics, timeSeries } = useMetrics();
+  
+  const data = {
+    power: metrics.facility.totalPower,
+    pue: metrics.derived.pue,
+    energySaved: metrics.derived.energySaved,
+    percentImproved: 8.5, // Static heuristic
+  };
 
-  const [trend, setTrend] = useState({
-    labels: [],
+  const trend = {
+    labels: timeSeries.labels,
     datasets: [{
       label: "Power Usage (kW)",
-      data: [],
+      data: timeSeries.power,
       borderColor: "#3b82f6",
       backgroundColor: "rgba(59, 130, 246, 0.15)",
       fill: true, tension: 0.4,
     }],
-  });
-
-  const push = (prev, val) => {
-    const labels = [...prev.labels, new Date().toLocaleTimeString()];
-    const d = [...prev.datasets[0].data, val];
-    if (labels.length > 12) { labels.shift(); d.shift(); }
-    return { ...prev, labels, datasets: [{ ...prev.datasets[0], data: d }] };
   };
-
-  useEffect(() => {
-    if (!settings.autoRefresh) return;
-    
-    const int = setInterval(() => {
-      const p = randF(6.0, 9.5);
-      setData({
-        power: p,
-        pue: randF(1.1, 1.6),
-        energySaved: randF(14.0, 15.0),
-        percentImproved: randF(8.0, 9.0),
-      });
-      setTrend(prev => push(prev, p));
-    }, settings.refreshInterval * 1000); // converting sec to ms
-    
-    return () => clearInterval(int);
-  }, [settings.autoRefresh, settings.refreshInterval]); // Depend on settings
 
   const getCurrencySymbol = () => {
     if (settings.currency === "EUR") return "€";

@@ -5,14 +5,19 @@ import { Chart as ChartJS, ArcElement, Tooltip } from "chart.js";
 
 ChartJS.register(ArcElement, Tooltip);
 
-const SEGMENTS = [
-  { label: "IT Equipment",   pct: 35, kw: 2.62, color: "#22c55e", bg: "rgba(34,197,94,0.12)"  },
-  { label: "Cooling System", pct: 25, kw: 1.87, color: "#3b82f6", bg: "rgba(59,130,246,0.12)" },
-  { label: "Power Supply",   pct: 20, kw: 1.50, color: "#facc15", bg: "rgba(250,204,21,0.15)" },
-  { label: "Others",         pct: 20, kw: 1.49, color: "#a855f7", bg: "rgba(168,85,247,0.12)" },
-];
-
 export default function PowerDistributionCard({ totalKw = 7.48 }) {
+  // Compute dynamically to ensure UI responsiveness.
+  const itkW = +(totalKw * 0.45).toFixed(2);
+  const coolingkW = +(totalKw * 0.35).toFixed(2);
+  const powerkW = +(totalKw * 0.12).toFixed(2);
+  const otherskW = +(totalKw - itkW - coolingkW - powerkW).toFixed(2);
+
+  const SEGMENTS = [
+    { label: "IT Equipment",   pct: Math.round((itkW / totalKw) * 100), kw: itkW, color: "#22c55e", bg: "rgba(34,197,94,0.12)"  },
+    { label: "Cooling System", pct: Math.round((coolingkW / totalKw) * 100), kw: coolingkW, color: "#3b82f6", bg: "rgba(59,130,246,0.12)" },
+    { label: "Power Supply",   pct: Math.round((powerkW / totalKw) * 100), kw: powerkW, color: "#facc15", bg: "rgba(250,204,21,0.15)" },
+    { label: "Others",         pct: Math.round((otherskW / totalKw) * 100), kw: otherskW, color: "#a855f7", bg: "rgba(168,85,247,0.12)" },
+  ];
   /* ── Center-label plugin ── */
   const centerPlugin = {
     id: "centerLabel",

@@ -6,9 +6,7 @@ import {
 } from "react-icons/fa";
 import { MdRefresh } from "react-icons/md";
 import { useSettings } from "../SettingsContext";
-
-const rand = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
-const randF = (min, max) => parseFloat((Math.random() * (max - min) + min).toFixed(1));
+import { useMetrics } from "../MetricsContext";
 
 /* ── helpers ── */
 function cpuClass(v) {
@@ -224,47 +222,10 @@ function ServerCard({ server, index, settings }) {
 ════════════════════════════════════════ */
 export default function Servers() {
   const { settings } = useSettings();
-  const [servers, setServers] = useState([]);
-  const [lastUpdate, setLastUpdate] = useState("");
+  const { metrics } = useMetrics();
+  const { servers } = metrics;
+  
   const [filter, setFilter] = useState("All");
-  const [refreshing, setRefreshing]   = useState(false);
-  const historiesRef = useRef({});
-
-  const generateServers = () => {
-    const data = [];
-    for (let i = 1; i <= 12; i++) {
-      const name = `Server-${String(i).padStart(2, "0")}`;
-      const cpu  = rand(15, 98);
-      const temp = rand(20, 42);
-      const ram  = rand(25, 95);
-      const net  = randF(0.5, 180);
-
-      let status = "Online";
-      if (temp > settings.tempLimit || cpu > settings.cpuLimit || ram > 90) status = "Warning";
-      if (cpu > 95) status = "Offline";
-
-      /* maintain per-server CPU history (last 10 ticks) */
-      if (!historiesRef.current[name]) historiesRef.current[name] = [];
-      historiesRef.current[name] = [...historiesRef.current[name], cpu].slice(-10);
-
-      data.push({ name, cpu, temp, ram, net, status, history: [...historiesRef.current[name]] });
-    }
-    setServers(data);
-    setLastUpdate(new Date().toLocaleTimeString());
-  };
-
-  useEffect(() => {
-    generateServers();
-    if (!settings.autoRefresh) return;
-    const interval = setInterval(generateServers, settings.refreshInterval * 1000);
-    return () => clearInterval(interval);
-  }, [settings.autoRefresh, settings.refreshInterval, settings.tempLimit, settings.cpuLimit]);
-
-  const handleRefresh = () => {
-    setRefreshing(true);
-    generateServers();
-    setTimeout(() => setRefreshing(false), 600);
-  };
 
   const filtered = filter === "All" ? servers : servers.filter(s => s.status === filter);
 
@@ -295,33 +256,12 @@ export default function Servers() {
             Server Monitoring
           </div>
           <div className="page-subtitle">
-            12 servers · Last updated {lastUpdate}
+            12 servers · Synchronized live
           </div>
         </div>
-
-        {/* Refresh button */}
-        <motion.button
-          onClick={handleRefresh}
-          whileHover={{ scale: 1.04 }}
-          whileTap={{ scale: 0.96 }}
-          style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "8px 16px",
-            background: "var(--bg-card)", border: "1px solid var(--border-color)",
-            borderRadius: 9, cursor: "pointer",
-            fontSize: 13, fontWeight: 600, color: "var(--slate-600)",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-          }}
-        >
-          <motion.span
-            animate={{ rotate: refreshing ? 360 : 0 }}
-            transition={{ duration: 0.5 }}
-            style={{ display: "flex" }}
-          >
-            <MdRefresh style={{ fontSize: 17 }} />
-          </motion.span>
-          Refresh
-        </motion.button>
+        <div style={{ padding: "8px 16px", color: "var(--slate-500)", fontSize: 13, fontWeight: 500 }}>
+          Global Engine Active 
+        </div>
       </motion.div>
 
       {/* ── Top KPI strip ── */}

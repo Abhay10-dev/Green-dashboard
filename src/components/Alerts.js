@@ -2,57 +2,21 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaExclamationCircle, FaExclamationTriangle, FaCheckCircle, FaBell, FaShieldAlt } from "react-icons/fa";
 import { useSettings } from "../SettingsContext";
+import { useMetrics } from "../MetricsContext";
 
 export default function Alerts() {
   const { settings } = useSettings();
+  const { alerts, acknowledgeAlert } = useMetrics();
   
-  // Simulated initial alert history
-  const [alerts, setAlerts] = useState([
-    { id: 1, type: "critical", metric: "Temperature", msg: "Node-2 temperature hit 38.2°C", time: new Date(Date.now() - 120000) },
-    { id: 2, type: "warning", metric: "CPU", msg: "Server-4 CPU usage spiked to 88%", time: new Date(Date.now() - 340000) },
-    { id: 3, type: "resolved", metric: "Power", msg: "Power surge normalized on Rack A", time: new Date(Date.now() - 860000) },
-    { id: 4, type: "warning", metric: "Temperature", msg: "Average Room Temp at 34.0°C", time: new Date(Date.now() - 1500000) },
-  ]);
-
   const [filter, setFilter] = useState("all");
 
-  useEffect(() => {
-    if (!settings.autoRefresh) return;
-    const interval = setInterval(() => {
-      // Simulate incoming alerts occasionally
-      if (Math.random() > 0.7) {
-        const isCrit = Math.random() > 0.6;
-        const metrics = ["Temperature", "CPU", "Power", "Cooling"];
-        const metric = metrics[Math.floor(Math.random() * metrics.length)];
-        
-        let msg = "";
-        if (metric === "Temperature") msg = `Temperature anomaly on Node-${Math.floor(Math.random() * 6) + 1} (${(Math.random() * 8 + 32).toFixed(1)}°C)`;
-        if (metric === "CPU") msg = `CPU load threshold exceeded (${Math.floor(Math.random() * 15 + 85)}%)`;
-        if (metric === "Power") msg = `Power draw warning on Rack ${Math.random() > 0.5 ? 'A' : 'B'}`;
-        if (metric === "Cooling") msg = `HVAC unit running at max capacity`;
-
-        const newAlert = {
-          id: Date.now(),
-          type: isCrit ? "critical" : "warning",
-          metric,
-          msg,
-          time: new Date(),
-        };
-
-        setAlerts(prev => [newAlert, ...prev].slice(0, 50)); // Keep last 50
-      }
-    }, settings.refreshInterval * 2000);
-
-    return () => clearInterval(interval);
-  }, [settings.autoRefresh, settings.refreshInterval]);
-
   const stats = {
-    critical: alerts.filter(a => a.type === "critical").length,
-    warning: alerts.filter(a => a.type === "warning").length,
-    resolved: alerts.filter(a => a.type === "resolved").length,
+    critical: alerts.filter(a => a.type === "critical" && a.status !== "resolved").length,
+    warning: alerts.filter(a => a.type === "warning" && a.status !== "resolved").length,
+    resolved: alerts.filter(a => a.status === "resolved").length,
   };
 
-  const filteredAlerts = alerts.filter(a => filter === "all" || a.type === filter);
+  const filteredAlerts = alerts.filter(a => filter === "all" || (filter === "resolved" ? a.status === "resolved" : (a.type === filter && a.status !== "resolved")));
 
   const getIcon = (type) => {
     switch(type) {
@@ -161,8 +125,8 @@ export default function Alerts() {
                   >
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        {getIcon(a.type)}
-                        {getPill(a.type)}
+                        {getIcon(a.status === "resolved" ? "resolved" : a.type)}
+                        {getPill(a.status === "resolved" ? "resolved" : a.type)}
                       </div>
                     </td>
                     <td style={{ fontSize: 13, color: "var(--slate-500)", whiteSpace: "nowrap" }}>
@@ -171,9 +135,9 @@ export default function Alerts() {
                     <td style={{ fontWeight: 600 }}>{a.metric}</td>
                     <td>{a.msg}</td>
                     <td>
-                      {a.type !== "resolved" && (
+                      {a.status !== "resolved" && (
                         <button 
-                          onClick={() => setAlerts(prev => prev.map(p => p.id === a.id ? { ...p, type: "resolved" } : p))}
+                          onClick={() => acknowledgeAlert(a.id)}
                           style={{
                             padding: "6px 12px", background: "var(--bg-main)",
                             border: "1px solid var(--border-color)", borderRadius: 6,

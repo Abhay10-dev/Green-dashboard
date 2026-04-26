@@ -7,10 +7,10 @@ import {
 } from "chart.js";
 import { FaServer, FaBolt, FaThermometerHalf, FaTachometerAlt, FaLeaf } from "react-icons/fa";
 import PowerDistributionCard from "./PowerDistributionCard";
+import { useMetrics } from "../MetricsContext";
+import { useSettings } from "../SettingsContext";
 
 ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend, Filler);
-
-const rand = (min, max) => +(Math.random() * (max - min) + min).toFixed(1);
 
 /* ── Mini SVG Sparkline ── */
 function MiniSparkline({ data, color }) {
@@ -102,87 +102,65 @@ const cardVariants = {
    Main Dashboard
 ═══════════════════════ */
 export default function Dashboard() {
-  const push = (prev, val, max = 12) => {
-    const labels = [...prev.labels, new Date().toLocaleTimeString()];
-    const data   = [...prev.datasets[0].data, val];
-    if (labels.length > max) { labels.shift(); data.shift(); }
-    return { ...prev, labels, datasets: [{ ...prev.datasets[0], data }] };
-  };
+  const { metrics, timeSeries } = useMetrics();
+  const { settings } = useSettings();
+  const { facility, derived, servers } = metrics;
 
-  const mkDataset = (label, color, alpha) => ({
-    labels: [],
+  const mkDataset = (label, dataArr, color, alpha) => ({
+    labels: timeSeries.labels,
     datasets: [{
-      label, data: [],
+      label, data: dataArr,
       borderColor: color,
       backgroundColor: `${color}${alpha}`,
       fill: true, tension: 0.45,
     }],
   });
 
-  const [cpuData,  setCpuData]  = useState(mkDataset("CPU %",    "#22c55e", "18"));
-  const [tempData, setTempData] = useState(mkDataset("Temp °C",  "#f97316", "12"));
-  const [kpi,      setKpi]      = useState({ servers: 12, power: 7.48, temp: 29, pue: 1.32, greenScore: 82 });
-  const [insights, setInsights] = useState({ energySaved: 12.4, co2Reduced: 9.8, uptime: 99.9 });
-  const [tempAlert, setTempAlert] = useState(false);
-  const [summary,   setSummary]   = useState({ minCpu: 0, maxCpu: 0, avgCpu: 0, minTemp: 0, maxTemp: 0, avgTemp: 0 });
-  const [sparklines, setSparklines] = useState({ cpu: [], temp: [], pwr: [], pue: [] });
+  const cpuData  = mkDataset("CPU %", timeSeries.cpu, "#22c55e", "18");
+  const tempData = mkDataset("Temp °C", timeSeries.temp, "#f97316", "12");
 
-  const cpuHist  = useRef([]);
-  const tempHist = useRef([]);
-  const pwrHist  = useRef([]);
-  const pueHist  = useRef([]);
+  const avgTemp = timeSeries.temp[timeSeries.temp.length - 1] || 0;
+  const tempAlert = avgTemp > settings.tempLimit;
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const cpu  = +rand(35, 92).toFixed(0);
-      const temp = +rand(20, 40).toFixed(1);
-      const pwr  = +rand(6.5, 9.0).toFixed(2);
-      const pue  = +rand(1.1, 1.6).toFixed(2);
-      const gs   = Math.max(0, Math.round(100 - (pue - 1) * 70 - (temp > 35 ? 18 : temp > 30 ? 8 : 0)));
+  let minCpu = 0, maxCpu = 0, avgCpu = 0;
+  let minTemp = 0, maxTemp = 0, avgTempSummary = 0;
+  if (timeSeries.cpu.length) {
+    minCpu = Math.min(...timeSeries.cpu);
+    maxCpu = Math.max(...timeSeries.cpu);
+    avgCpu = Math.round(timeSeries.cpu.reduce((a, b) => a + b, 0) / timeSeries.cpu.length);
+    minTemp = Math.min(...timeSeries.temp);
+    maxTemp = Math.max(...timeSeries.temp);
+    avgTempSummary = +(timeSeries.temp.reduce((a, b) => a + b, 0) / timeSeries.temp.length).toFixed(1);
+  }
 
-      setCpuData(prev  => push(prev, cpu));
-      setTempData(prev => push(prev, temp));
+  const kpi = {
+    servers: servers.length,
+    power: facility.totalPower,
+    temp: avgTemp,
+    pue: derived.pue,
+    greenScore: derived.greenScore,
+  };
 
-      cpuHist.current  = [...cpuHist.current,  cpu].slice(-8);
-      tempHist.current = [...tempHist.current, temp].slice(-8);
-      pwrHist.current  = [...pwrHist.current,  pwr].slice(-8);
-      pueHist.current  = [...pueHist.current,  pue].slice(-8);
+  const formatTemp = (val) => settings.tempUnit === "F" ? (val * 9/5 + 32).toFixed(1) : val.toFixed(1);
+  const tSym = `°${settings.tempUnit}`;
+  
+  const formatKW = (val) => settings.energyUnit === "MW" ? (val / 1000).toFixed(3) : val.toFixed(2);
+  const eSym = settings.energyUnit;
 
-      setSparklines({
-        cpu: [...cpuHist.current],  temp: [...tempHist.current],
-        pwr: [...pwrHist.current],  pue:  [...pueHist.current],
-      });
-
-      const cArr = cpuHist.current, tArr = tempHist.current;
-      if (cArr.length) {
-        setSummary({
-          minCpu:  Math.min(...cArr), maxCpu: Math.max(...cArr),
-          avgCpu:  Math.round(cArr.reduce((a, b) => a + b, 0) / cArr.length),
-          minTemp: +Math.min(...tArr).toFixed(1),
-          maxTemp: +Math.max(...tArr).toFixed(1),
-          avgTemp: +(tArr.reduce((a, b) => a + b, 0) / tArr.length).toFixed(1),
-        });
-      }
-
-      setKpi({ servers: 12, power: pwr, temp, pue, greenScore: gs });
-      setInsights(prev => ({
-        energySaved: +(prev.energySaved + rand(-0.3, 0.3)).toFixed(1),
-        co2Reduced:  +(prev.co2Reduced  + rand(-0.2, 0.2)).toFixed(1),
-        uptime:      +(Math.min(100, prev.uptime + rand(-0.05, 0.05))).toFixed(1),
-      }));
-      setTempAlert(temp > 35);
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
+  const insights = {
+    energySaved: derived.energySaved.toFixed(1),
+    co2Reduced: (derived.energySaved * 0.4).toFixed(1), // dummy correlation
+    uptime: derived.uptime,
+  };
 
   const greenCol   = kpi.greenScore >= 75 ? "#22c55e" : kpi.greenScore >= 50 ? "#f97316" : "#ef4444";
   const greenLabel = kpi.greenScore >= 75 ? "Excellent" : kpi.greenScore >= 50 ? "Good" : "Needs Work";
 
   const topCards = [
-    { label: "Total Servers",   value: 12,              icon: <FaServer />,          color: "green",  badge: "All active",                        badgeType: "up",      spark: Array(8).fill(12), sparkColor: "#22c55e" },
-    { label: "Power Usage",     value: `${kpi.power} kW`, icon: <FaBolt />,           color: "blue",   badge: kpi.power > 8 ? "High" : "Normal",  badgeType: kpi.power > 8 ? "down" : "up", spark: sparklines.pwr, sparkColor: "#3b82f6" },
-    { label: "Avg Temperature", value: `${kpi.temp}°C`, icon: <FaThermometerHalf />, color: "orange", badge: kpi.temp > 35 ? "⚠ High" : "Normal", badgeType: kpi.temp > 35 ? "down" : "neutral", spark: sparklines.temp, sparkColor: "#f97316" },
-    { label: "PUE Score",       value: kpi.pue,         icon: <FaTachometerAlt />,   color: "purple", badge: kpi.pue < 1.3 ? "Excellent" : kpi.pue < 1.5 ? "Good" : "Fair", badgeType: kpi.pue < 1.3 ? "up" : "neutral", spark: sparklines.pue, sparkColor: "#a855f7" },
+    { label: "Total Servers",   value: kpi.servers,              icon: <FaServer />,          color: "green",  badge: "All active",                        badgeType: "up",      spark: timeSeries.cpu.slice(-8), sparkColor: "#22c55e" },
+    { label: "Power Usage",     value: `${formatKW(kpi.power)} ${eSym}`, icon: <FaBolt />,           color: "blue",   badge: kpi.power > settings.powerLimit ? "High" : "Normal",  badgeType: kpi.power > settings.powerLimit ? "down" : "up", spark: timeSeries.power.slice(-8), sparkColor: "#3b82f6" },
+    { label: "Avg Temperature", value: `${formatTemp(kpi.temp)}${tSym}`, icon: <FaThermometerHalf />, color: "orange", badge: tempAlert ? "⚠ High" : "Normal", badgeType: tempAlert ? "down" : "neutral", spark: timeSeries.temp.slice(-8), sparkColor: "#f97316" },
+    { label: "PUE Score",       value: kpi.pue,         icon: <FaTachometerAlt />,   color: "purple", badge: kpi.pue < 1.3 ? "Excellent" : kpi.pue < 1.5 ? "Good" : "Fair", badgeType: kpi.pue < 1.3 ? "up" : "neutral", spark: timeSeries.pue.slice(-8), sparkColor: "#a855f7" },
   ];
 
   return (
@@ -230,7 +208,7 @@ export default function Dashboard() {
             exit={{ opacity: 0, y: -8, height: 0 }}
             transition={{ duration: 0.25 }}
           >
-            🌡️ <strong>Temperature Alert:</strong>&nbsp;Average temperature exceeded 35°C — check cooling systems.
+            🌡️ <strong>Temperature Alert:</strong>&nbsp;Average temperature exceeded {formatTemp(settings.tempLimit)}{tSym} — check cooling systems.
           </motion.div>
         )}
       </AnimatePresence>
@@ -272,9 +250,9 @@ export default function Dashboard() {
           </div>
           <Line data={cpuData} options={mkOpts()} />
           <StatChips items={[
-            { label: "Min",  value: `${summary.minCpu}%`,  col: "#22c55e" },
-            { label: "Avg",  value: `${summary.avgCpu}%`,  col: "#64748b" },
-            { label: "Max",  value: `${summary.maxCpu}%`,  col: "#ef4444" },
+            { label: "Min",  value: `${minCpu}%`,  col: "#22c55e" },
+            { label: "Avg",  value: `${avgCpu}%`,  col: "var(--slate-500)" },
+            { label: "Max",  value: `${maxCpu}%`,  col: "#ef4444" },
           ]} />
         </motion.div>
 
@@ -285,13 +263,13 @@ export default function Dashboard() {
         >
           <div className="chart-card-header">
             <div className="chart-card-title">🌡️ Temperature</div>
-            <span className="chart-badge temp">°C</span>
+            <span className="chart-badge temp">{tSym}</span>
           </div>
           <Line data={tempData} options={mkOpts()} />
           <StatChips items={[
-            { label: "Min",  value: `${summary.minTemp}°C`, col: "#22c55e" },
-            { label: "Avg",  value: `${summary.avgTemp}°C`, col: "#64748b" },
-            { label: "Max",  value: `${summary.maxTemp}°C`, col: "#ef4444" },
+            { label: "Min",  value: `${formatTemp(minTemp)}${tSym}`, col: "#22c55e" },
+            { label: "Avg",  value: `${formatTemp(avgTempSummary)}${tSym}`, col: "var(--slate-500)" },
+            { label: "Max",  value: `${formatTemp(maxTemp)}${tSym}`, col: "#ef4444" },
           ]} />
         </motion.div>
 

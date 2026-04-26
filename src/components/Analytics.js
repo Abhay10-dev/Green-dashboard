@@ -7,11 +7,10 @@ import {
 } from "chart.js";
 import { FaChartLine } from "react-icons/fa";
 import PowerDistributionCard from "./PowerDistributionCard";
+import { useMetrics } from "../MetricsContext";
+import { useSettings } from "../SettingsContext";
 
 ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend, Filler);
-
-const rand = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
-const randF = (min, max) => parseFloat((Math.random() * (max - min) + min).toFixed(2));
 
 /* ── Shared chart options ── */
 const mkOpts = (color) => ({
@@ -130,67 +129,44 @@ const cardVariants = {
    Main Analytics Page
 ════════════════════════ */
 export default function Analytics() {
-  const mkDs = (label, color, alpha) => ({
-    labels: [],
-    datasets: [{ label, data: [], borderColor: color, backgroundColor: `${color}${alpha}`, fill: true, tension: 0.45 }],
+  const { metrics, timeSeries } = useMetrics();
+  const { settings } = useSettings();
+  
+  const mkDs = (label, color, alpha, data) => ({
+    labels: timeSeries.labels,
+    datasets: [{ label, data, borderColor: color, backgroundColor: `${color}${alpha}`, fill: true, tension: 0.45 }],
   });
 
-  const [cpuData,  setCpuData]  = useState(mkDs("CPU %",       "#22c55e", "18"));
-  const [tempData, setTempData] = useState(mkDs("Temp °C",     "#f97316", "12"));
-  const [pueData,  setPueData]  = useState(mkDs("PUE",         "#a855f7", "15"));
+  const formatTemp = (val) => settings.tempUnit === "F" ? (val * 9/5 + 32).toFixed(1) : val.toFixed(1);
+  const tSym = `°${settings.tempUnit}`;
 
-  const [stats,    setStats]    = useState({
-    maxCPU: 0, minCPU: 100, avgCPU: 0,
-    maxTemp: 0, minTemp: 100, avgTemp: 0,
-    latestPUE: 0, avgPUE: 0,
-  });
+  const cpuData  = mkDs("CPU %",   "#22c55e", "18", timeSeries.cpu);
+  const tempData = mkDs(`Temp ${tSym}`, "#f97316", "12", timeSeries.temp);
+  const pueData  = mkDs("PUE",     "#a855f7", "15", timeSeries.pue);
 
-  const cpuArr  = useRef([]);
-  const tempArr = useRef([]);
-  const pueArr  = useRef([]);
+  const tC = timeSeries.cpu;
+  const tT = timeSeries.temp;
+  const tP = timeSeries.pue;
 
-  const push = (prev, val, max = 12) => {
-    const labels = [...prev.labels, new Date().toLocaleTimeString()];
-    const data   = [...prev.datasets[0].data, val];
-    if (labels.length > max) { labels.shift(); data.shift(); }
-    return { ...prev, labels, datasets: [{ ...prev.datasets[0], data }] };
+  const stats = {
+    maxCPU: tC.length ? Math.max(...tC) : 0,
+    minCPU: tC.length ? Math.min(...tC) : 0,
+    avgCPU: tC.length ? Math.round(tC.reduce((a, b) => a + b, 0) / tC.length) : 0,
+    maxTemp: tT.length ? Math.max(...tT) : 0,
+    minTemp: tT.length ? Math.min(...tT) : 0,
+    avgTemp: tT.length ? +(tT.reduce((a, b) => a + b, 0) / tT.length).toFixed(1) : 0,
+    latestPUE: tP.length ? tP[tP.length - 1] : 0,
+    avgPUE: tP.length ? +(tP.reduce((a, b) => a + b, 0) / tP.length).toFixed(2) : 0,
   };
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const cpu  = rand(38, 95);
-      const temp = rand(20, 40);
-      const pue  = randF(1.1, 1.6);
-
-      cpuArr.current.push(cpu);
-      tempArr.current.push(temp);
-      pueArr.current.push(pue);
-
-      setCpuData(prev  => push(prev, cpu));
-      setTempData(prev => push(prev, temp));
-      setPueData(prev  => push(prev, pue));
-
-      const ca = cpuArr.current, ta = tempArr.current, pa = pueArr.current;
-      setStats({
-        maxCPU:  Math.max(...ca), minCPU: Math.min(...ca),
-        avgCPU:  Math.round(ca.reduce((a, b) => a + b, 0) / ca.length),
-        maxTemp: Math.max(...ta), minTemp: Math.min(...ta),
-        avgTemp: +(ta.reduce((a, b) => a + b, 0) / ta.length).toFixed(1),
-        latestPUE: pue,
-        avgPUE: +(pa.reduce((a, b) => a + b, 0) / pa.length).toFixed(2),
-      });
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
 
   /* ── Top quick-stat chips ── */
   const quickStats = [
     { label: "Max CPU",   value: `${stats.maxCPU}%`,     col: "#ef4444", bg: "#fef2f2",   border: "#fecaca" },
-    { label: "Avg CPU",   value: `${stats.avgCPU}%`,     col: "#22c55e", bg: "var(--green-50)", border: "#bbf7d0" },
-    { label: "Min CPU",   value: `${stats.minCPU}%`,     col: "#3b82f6", bg: "#eff6ff",   border: "#bfdbfe" },
-    { label: "Max Temp",  value: `${stats.maxTemp}°C`,   col: "#ef4444", bg: "#fef2f2",   border: "#fecaca" },
-    { label: "Avg Temp",  value: `${stats.avgTemp}°C`,   col: "#f97316", bg: "#fff7ed",   border: "#fed7aa" },
-    { label: "Avg PUE",   value: stats.avgPUE,           col: "#a855f7", bg: "#faf5ff",   border: "#e9d5ff" },
+    { label: "Avg CPU",   value: `${stats.avgCPU}%`,     col: "#22c55e", bg: "var(--green-50)", border: "var(--green-200)" },
+    { label: "Max Temp",  value: `${formatTemp(stats.maxTemp)}${tSym}`,  col: "#ea580c", bg: "#fff7ed",   border: "#fed7aa" },
+    { label: "Cooling Efficiency", value: `${metrics.derived.coolingPower > 0 ? Math.round(100 - (metrics.derived.coolingPower/metrics.facility.totalPower)*100) : 88}%`, col: "#3b82f6", bg: "#eff6ff", border: "#bfdbfe" },
+    { label: "Avg PUE",   value: stats.avgPUE,           col: "#9333ea", bg: "#faf5ff",   border: "#e9d5ff" },
+    { label: "Carbon Saved", value: `${(metrics.derived.energySaved * 0.4).toFixed(1)}kg`, col: "#0d9488", bg: "#f0fdfa", border: "#ccfbf1" },
   ];
 
   const statCards = [
@@ -204,9 +180,9 @@ export default function Analytics() {
     },
     {
       label: "Temperature Range",
-      value: `${stats.avgTemp}°C`,
+      value: `${formatTemp(stats.avgTemp)}${tSym}`,
       icon: "🌡️",
-      sub: `${stats.minTemp}°C – ${stats.maxTemp}°C recorded`,
+      sub: `${formatTemp(stats.minTemp)}${tSym} – ${formatTemp(stats.maxTemp)}${tSym} recorded`,
       color: "#f97316", bg: "#fff7ed",
       progress: stats.avgTemp, max: 45, progressColor: "#f97316",
     },
@@ -258,26 +234,36 @@ export default function Analytics() {
         ))}
       </motion.div>
 
-      {/* ── Charts Row 1: CPU | Temp | Power Distribution ── */}
+      {/* ── Charts Row 1: CPU | Thermal History | Power Distribution ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 0.82fr", gap: 18, marginBottom: 18 }}>
-        {[
-          { title: "CPU Usage Trend",    badge: "CPU %", badgeCls: "",     data: cpuData  },
-          { title: "Temperature Trend",  badge: "°C",    badgeCls: "temp", data: tempData },
-        ].map((c, i) => (
-          <motion.div key={c.title} className="chart-card"
-            style={{ display: "flex", flexDirection: "column" }}
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.18 + i * 0.1, duration: 0.4 }}
-          >
-            <div className="chart-card-header">
-              <div className="chart-card-title">{c.title}</div>
-              <span className={`chart-badge ${c.badgeCls}`}>{c.badge}</span>
-            </div>
-            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-              <Line data={c.data} options={mkOpts()} />
-            </div>
-          </motion.div>
-        ))}
+        <motion.div className="chart-card"
+          style={{ display: "flex", flexDirection: "column" }}
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.18, duration: 0.4 }}
+        >
+          <div className="chart-card-header">
+            <div className="chart-card-title">CPU Usage Trend</div>
+            <span className="chart-badge">CPU %</span>
+          </div>
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+            <Line data={cpuData} options={mkOpts()} />
+          </div>
+        </motion.div>
+
+        {/* Thermal Map Card */}
+        <motion.div className="chart-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.4 }} style={{ display: "flex", flexDirection: "column" }}>
+          <div className="chart-card-header">
+            <div className="chart-card-title">🌡️ Thermal History</div>
+          </div>
+          <div style={{ flex: 1, position: "relative", minHeight: 200 }}>
+            <Line data={tempData} options={mkOpts("#f97316")} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "center", gap: 24, marginTop: 16 }}>
+            <div><span style={{ fontSize: 12, color: "var(--slate-500)" }}>Peak:</span> <strong style={{ color: "#ef4444" }}>{formatTemp(stats.maxTemp)}{tSym}</strong></div>
+            <div><span style={{ fontSize: 12, color: "var(--slate-500)" }}>Average:</span> <strong style={{ color: "var(--text-main)" }}>{formatTemp(stats.avgTemp)}{tSym}</strong></div>
+            <div><span style={{ fontSize: 12, color: "var(--slate-500)" }}>Minimum:</span> <strong style={{ color: "#22c55e" }}>{formatTemp(stats.minTemp)}{tSym}</strong></div>
+          </div>
+        </motion.div>
 
         {/* Power Distribution */}
         <motion.div className="chart-card"
@@ -288,7 +274,7 @@ export default function Analytics() {
           <div className="chart-card-header">
             <div className="chart-card-title">Power Distribution</div>
           </div>
-          <PowerDistributionCard />
+          <PowerDistributionCard totalKw={metrics.facility.totalPower} />
         </motion.div>
       </div>
 

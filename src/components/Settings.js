@@ -90,7 +90,7 @@ export default function Settings() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
           <div>
             <div className="page-title">
-              <FaCog style={{ color: "var(--brand-500)" }} /> Configuration & Settings
+              <FaCog style={{ color: "var(--green-500)" }} /> Configuration & Settings
             </div>
             <div className="page-subtitle">Manage system thresholds, alerts, and formatting preferences.</div>
           </div>
@@ -100,7 +100,7 @@ export default function Settings() {
             whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.96 }}
             onClick={handleSave}
             style={{
-              background: savedMsg ? "#22c55e" : "var(--brand-500)", color: "#fff",
+              background: savedMsg ? "#22c55e" : "var(--green-500)", color: "#fff",
               border: "none", padding: "10px 20px", borderRadius: 8,
               fontSize: 14, fontWeight: 600, cursor: "pointer",
               display: "flex", alignItems: "center", gap: 8,
@@ -138,8 +138,8 @@ export default function Settings() {
                   padding: "12px 14px", borderRadius: 10,
                   fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer",
                   transition: "all 0.2s",
-                  background: activeTab === t.id ? "var(--brand-50)" : "transparent",
-                  color: activeTab === t.id ? "var(--brand-600)" : "#64748b",
+                  background: activeTab === t.id ? "var(--green-50)" : "transparent",
+                  color: activeTab === t.id ? "var(--green-600)" : "#64748b",
                 }}
               >
                 <span style={{ fontSize: 16, opacity: activeTab === t.id ? 1 : 0.6 }}>{t.icon}</span>
@@ -276,7 +276,7 @@ export default function Settings() {
                   </FormGroup>
 
                   <FormGroup label="Account Role" desc="Permissions assigned to your account.">
-                    <div style={{ fontWeight: 600, color: "var(--brand-600)", background: "var(--brand-50)", padding: "6px 12px", borderRadius: 6, display: "inline-block" }}>
+                    <div style={{ fontWeight: 600, color: "var(--green-600)", background: "var(--green-50)", padding: "6px 12px", borderRadius: 6, display: "inline-block" }}>
                       {cfg.role}
                     </div>
                   </FormGroup>

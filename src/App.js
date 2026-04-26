@@ -5,10 +5,11 @@ import Servers from "./components/Server";
 import Analytics from "./components/Analytics";
 import Energy from "./components/Energy";
 import Cooling from "./components/Cooling";
-import Settings from "./components/Settings";
 import About from "./components/About";
 import Alerts from "./components/Alerts";
+import Settings from "./components/Settings";
 import { SettingsProvider } from "./SettingsContext";
+import { MetricsProvider } from "./MetricsContext";
 import "./App.css";
 
 export default function App() {
@@ -16,20 +17,22 @@ export default function App() {
 
   return (
     <SettingsProvider>
-      <div className="app">
-        <Sidebar setPage={setPage} activePage={page} />
+      <MetricsProvider>
+        <div className="app">
+          <Sidebar setPage={setPage} activePage={page} />
 
-        <div className="main">
-          {page === "dashboard" && <Dashboard />}
-          {page === "servers"   && <Servers />}
-          {page === "energy"    && <Energy />}
-          {page === "cooling"   && <Cooling />}
-          {page === "alerts"    && <Alerts />}
-          {page === "settings"  && <Settings />}
-          {page === "analytics" && <Analytics />}
-          {page === "about"     && <About />}
+          <div className="main">
+            {page === "dashboard" && <Dashboard />}
+            {page === "servers"   && <Servers />}
+            {page === "energy"    && <Energy />}
+            {page === "cooling"   && <Cooling />}
+            {page === "alerts"    && <Alerts />}
+            {page === "settings"  && <Settings />}
+            {page === "analytics" && <Analytics />}
+            {page === "about"     && <About />}
+          </div>
         </div>
-      </div>
+      </MetricsProvider>
     </SettingsProvider>
   );
 }

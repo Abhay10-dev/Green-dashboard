@@ -7,11 +7,9 @@ import {
 } from "chart.js";
 import { FaSnowflake, FaThermometerHalf, FaServer, FaExclamationTriangle } from "react-icons/fa";
 import { useSettings } from "../SettingsContext";
+import { useMetrics } from "../MetricsContext";
 
 ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend, Filler);
-
-const randF = (min, max) => parseFloat((Math.random() * (max - min) + min).toFixed(2));
-const rand = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
 
 const chartOpts = {
   responsive: true,
@@ -32,57 +30,31 @@ const cardVariants = {
 
 export default function Cooling() {
   const { settings } = useSettings();
-  const [data, setData] = useState({
-    avgTemp: 28,
-    coolingEffic: 88,
-    servers: [],
-  });
+  const { metrics, timeSeries } = useMetrics();
 
-  const [trend, setTrend] = useState({
-    labels: [],
+  const avgTemp = metrics.facility.avgTemp || 25;
+  const servers = [...metrics.servers].sort((a, b) => b.temp - a.temp).slice(0, 6);
+  
+  const effic = avgTemp > settings.tempLimit ? 58 : avgTemp > settings.tempLimit - 5 ? 72 : 91;
+
+  const trend = {
+    labels: timeSeries.labels,
     datasets: [{
       label: "Average Temp (°C)",
-      data: [],
+      data: timeSeries.temp,
       borderColor: "#f97316",
       backgroundColor: "rgba(249, 115, 22, 0.15)",
       fill: true, tension: 0.4,
     }],
-  });
-
-  const push = (prev, val) => {
-    const labels = [...prev.labels, new Date().toLocaleTimeString()];
-    const d = [...prev.datasets[0].data, val];
-    if (labels.length > 12) { labels.shift(); d.shift(); }
-    return { ...prev, labels, datasets: [{ ...prev.datasets[0], data: d }] };
   };
-
-  useEffect(() => {
-    if (!settings.autoRefresh) return;
-
-    const int = setInterval(() => {
-      const avg = randF(25.0, 38.0);
-      const servs = Array.from({ length: 6 }).map((_, i) => {
-        // High chance of overheating for simulation
-        const base = i === 2 && Math.random() > 0.5 ? rand(34, 45) : rand(22, 34);
-        return { name: `Node-${i + 1}`, temp: base };
-      }).sort((a, b) => b.temp - a.temp); // highest temp first
-      
-      const effic = avg > settings.tempLimit ? rand(50, 65) : avg > settings.tempLimit - 5 ? rand(65, 80) : rand(80, 95);
-
-      setData({ avgTemp: avg, servers: servs, coolingEffic: effic });
-      setTrend(prev => push(prev, avg));
-    }, settings.refreshInterval * 1000);
-
-    return () => clearInterval(int);
-  }, [settings.autoRefresh, settings.refreshInterval, settings.tempLimit]);
 
   // Adjust display temperature if Fahrenheit is selected in Settings
   const displayTemp = (t) => settings.tempUnit === "F" ? (t * 9/5 + 32).toFixed(1) : t.toFixed(1);
   const tempSym = `°${settings.tempUnit}`;
 
-  const isAlert = data.avgTemp > settings.tempLimit;
-  const sysState = isAlert ? "Overloaded" : data.avgTemp > settings.tempLimit - 5 ? "Active" : "Idle";
-  const stateCol = isAlert ? "#ef4444" : data.avgTemp > settings.tempLimit - 5 ? "#f97316" : "#22c55e";
+  const isAlert = avgTemp > settings.tempLimit;
+  const sysState = isAlert ? "Overloaded" : avgTemp > settings.tempLimit - 5 ? "Active" : "Idle";
+  const stateCol = isAlert ? "#ef4444" : avgTemp > settings.tempLimit - 5 ? "#f97316" : "#22c55e";
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
@@ -114,9 +86,9 @@ export default function Cooling() {
       {/* ── KPI Strip ── */}
       <div className="cards" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: 20 }}>
         {[
-          { label: "Average Temperature", value: `${displayTemp(data.avgTemp)}${tempSym}`, icon: <FaThermometerHalf />, col: isAlert ? "red" : "orange", detail: isAlert ? "High Risk" : "Stable" },
+          { label: "Average Temperature", value: `${displayTemp(avgTemp)}${tempSym}`, icon: <FaThermometerHalf />, col: isAlert ? "red" : "orange", detail: isAlert ? "High Risk" : "Stable" },
           { label: "Cooling System State", value: sysState, icon: <FaSnowflake />, col: isAlert ? "red" : "blue", detail: "HVAC Status", valCol: stateCol },
-          { label: "Cooling Efficiency", value: `${data.coolingEffic}%`, icon: <FaServer />, col: "green", detail: "Heat vs Cooling Load" },
+          { label: "Cooling Efficiency", value: `${effic}%`, icon: <FaServer />, col: "green", detail: "Heat vs Cooling Load" },
         ].map((c, i) => (
           <motion.div key={c.label} className="card kpi-card" custom={i} variants={cardVariants} initial="hidden" animate="visible" whileHover={{ y: -3 }}>
             <div className="kpi-top">
@@ -128,8 +100,8 @@ export default function Cooling() {
             {c.label === "Cooling Efficiency" && (
               <div style={{ background: "var(--slate-100)", height: 6, borderRadius: 5, marginTop: 10, overflow: "hidden" }}>
                 <motion.div 
-                  initial={{ width: 0 }} animate={{ width: `${data.coolingEffic}%` }} transition={{ duration: 0.5 }}
-                  style={{ height: "100%", background: data.coolingEffic < 60 ? "#ef4444" : "#22c55e" }} 
+                  initial={{ width: 0 }} animate={{ width: `${effic}%` }} transition={{ duration: 0.5 }}
+                  style={{ height: "100%", background: effic < 60 ? "#ef4444" : "#22c55e" }} 
                 />
               </div>
             )}
@@ -154,7 +126,7 @@ export default function Cooling() {
             <div className="chart-card-title">🔥 Server Heat Monitoring</div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
-            {data.servers.map(s => {
+            {servers.map(s => {
               const isHot = s.temp > settings.tempLimit;
               return (
                 <div key={s.name} style={{
